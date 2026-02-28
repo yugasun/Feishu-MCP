@@ -483,3 +483,103 @@ export const TaskCustomCompleteSchema = z.object({
 }).optional().describe(
   'Custom complete configuration (optional). Controls how the task is completed on different platforms.'
 );
+
+// ============ 飞书日历相关 Schema ============
+
+// 日历事件标题参数定义
+export const CalendarEventSummarySchema = z.string().describe(
+  'Calendar event summary/title (required). The main title of the event, displayed in the calendar.'
+);
+
+// 日历事件描述参数定义
+export const CalendarEventDescriptionSchema = z.string().optional().describe(
+  'Calendar event description (optional). Detailed description or notes for the event.'
+);
+
+// 日历事件时间参数定义
+export const CalendarEventTimeSchema = z.object({
+  timestamp: z.string().optional().describe(
+    'Timestamp in seconds (required for non-all-day events). Unix timestamp string, e.g. "1675454764". ' +
+    'Either timestamp or date must be provided.'
+  ),
+  date: z.string().optional().describe(
+    'Date string in "YYYY-MM-DD" format (required for all-day events). e.g. "2025-03-01". ' +
+    'Either timestamp or date must be provided.'
+  ),
+  timezone: z.string().optional().describe(
+    'Timezone (optional). e.g. "Asia/Shanghai". If not provided, defaults to the calendar timezone.'
+  ),
+}).describe(
+  'Event time. For all-day events, use "date" field (YYYY-MM-DD). For timed events, use "timestamp" field (Unix seconds).'
+);
+
+// 日历事件参与者参数定义
+export const CalendarEventAttendeesSchema = z.array(z.object({
+  type: z.enum(['user', 'chat', 'resource', 'third_party']).optional().default('user').describe(
+    'Attendee type (optional). "user" (default), "chat" (group chat), "resource" (meeting room), "third_party" (external).'
+  ),
+  user_id: z.string().optional().describe(
+    'User ID (required when type is "user"). The open_id, user_id or union_id of the user.'
+  ),
+  chat_id: z.string().optional().describe(
+    'Chat ID (required when type is "chat"). The group chat ID.'
+  ),
+  room_id: z.string().optional().describe(
+    'Room ID (required when type is "resource"). The meeting room ID.'
+  ),
+  third_party_email: z.string().optional().describe(
+    'Third-party email (required when type is "third_party"). External attendee email address.'
+  ),
+  is_optional: z.boolean().optional().default(false).describe(
+    'Whether the attendee is optional (optional). Default is false (required attendee).'
+  ),
+})).optional().describe(
+  'Event attendees (optional). Array of attendees for the event. Each attendee needs a type and corresponding ID.'
+);
+
+// 日历事件提醒参数定义
+export const CalendarEventRemindersSchema = z.array(z.object({
+  minutes: z.number().describe(
+    'Reminder minutes before event (required). e.g. 5 for 5 minutes before, 15 for 15 minutes before, 60 for 1 hour before.'
+  ),
+})).optional().describe(
+  'Event reminders (optional). Array of reminder configurations. Each reminder specifies minutes before the event to trigger.'
+);
+
+// 日历事件可见性参数定义
+export const CalendarEventVisibilitySchema = z.enum(['default', 'public', 'private']).optional().default('default').describe(
+  'Event visibility (optional). "default": uses calendar default, "public": visible to all, "private": only visible to attendees. Default is "default".'
+);
+
+// 日历事件忙闲状态参数定义
+export const CalendarEventFreeBusyStatusSchema = z.enum(['busy', 'free']).optional().default('busy').describe(
+  'Free/busy status during the event (optional). "busy": show as busy (default), "free": show as free.'
+);
+
+// 日历ID参数定义
+export const CalendarIdSchema = z.string().optional().describe(
+  'Calendar ID (optional). The ID of the calendar to create the event in. If not provided, the primary calendar will be used. ' +
+  'You can obtain calendar IDs from the calendar list.'
+);
+
+// 日历事件颜色参数定义
+export const CalendarEventColorSchema = z.number().optional().describe(
+  'Event color index (optional). Ranges from 0-9, representing different colors for the event in the calendar view.'
+);
+
+// 日历事件重复规则参数定义
+export const CalendarEventRecurrenceSchema = z.string().optional().describe(
+  'Recurrence rule in RRULE format (optional). e.g. "FREQ=WEEKLY;INTERVAL=1;BYDAY=MO,WE,FR" for Monday/Wednesday/Friday weekly repeat. ' +
+  '"FREQ=DAILY;COUNT=10" for daily repeat 10 times. "FREQ=MONTHLY;BYMONTHDAY=1" for first day of each month.'
+);
+
+// 日历事件地点参数定义
+export const CalendarEventLocationSchema = z.object({
+  name: z.string().optional().describe('Location name (optional). e.g. "Conference Room A".'),
+  address: z.string().optional().describe('Location address (optional). e.g. "Building 1, Floor 3".'),
+  latitude: z.number().optional().describe('Latitude (optional).'),
+  longitude: z.number().optional().describe('Longitude (optional).'),
+}).optional().describe(
+  'Event location (optional). Physical or virtual location for the event.'
+);
+

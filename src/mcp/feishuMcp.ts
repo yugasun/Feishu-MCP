@@ -5,6 +5,7 @@ import { registerFeishuTools } from './tools/feishuTools.js';
 import { registerFeishuBlockTools } from './tools/feishuBlockTools.js';
 import { registerFeishuFolderTools } from './tools/feishuFolderTools.js';
 import { registerFeishuTaskTools } from './tools/feishuTaskTools.js';
+import { registerFeishuCalendarTools } from './tools/feishuCalendarTools.js';
 
 export const serverInfo = {
   name: "Feishu MCP Server",
@@ -67,5 +68,6 @@ export class FeishuMcp extends McpServer {
     registerFeishuBlockTools(this, this.feishuService);
     registerFeishuFolderTools(this, this.feishuService);
     registerFeishuTaskTools(this, this.feishuService);
+    registerFeishuCalendarTools(this, this.feishuService);
   }
 } 

@@ -181,6 +181,7 @@ export class FeishuApiService extends BaseApiService {
       "space:document:retrieve",
       "space:folder:create",
       "task:task:write",
+      "calendar:calendar",
       "wiki:space:read",
       "wiki:space:retrieve",
       "wiki:wiki",
@@ -291,7 +292,7 @@ export class FeishuApiService extends BaseApiService {
     // 生成应用级别的scope校验key（包含authType，因为tenant和user权限不同）
     const scopeKey = this.generateScopeKey(appId, appSecret, authType);
 
-    const scopeVersion = '2.0.0'; // 当前scope版本号，可以根据需要更新
+    const scopeVersion = '2.1.0'; // 当前scope版本号，可以根据需要更新（2.1.0: 添加 calendar:calendar, task:task:write）
     
     // 检查是否需要校验
     if (!tokenCacheManager.shouldValidateScope(scopeKey, scopeVersion)) {
@@ -2222,6 +2223,236 @@ export class FeishuApiService extends BaseApiService {
       return response;
     } catch (error) {
       this.handleApiError(error, '创建飞书任务失败');
+    }
+  }
+
+  // ============ 飞书日历相关方法 ============
+
+  /**
+   * 获取用户主日历ID
+   * @returns 主日历ID
+   */
+  public async getPrimaryCalendarId(): Promise<string | null> {
+    try {
+      Logger.info('正在通过日历列表获取主日历ID...');
+      const endpoint = '/calendar/v4/calendars';
+      const response = await this.get(endpoint);
+      Logger.info(`日历列表API响应: ${JSON.stringify(response)}`);
+
+      const calendars = response?.calendar_list;
+      if (!calendars || !Array.isArray(calendars) || calendars.length === 0) {
+        Logger.warn(`未找到任何日历，响应结构: ${JSON.stringify(response)}`);
+        return null;
+      }
+
+      Logger.info(`日历列表共 ${calendars.length} 个日历`);
+      for (const cal of calendars) {
+        Logger.info(`日历: id=${cal.calendar_id}, type=${cal.type}, role=${cal.role}, summary=${cal.summary}`);
+      }
+
+      // 优先查找 type 为 "primary" 且 role 为 "owner" 的日历
+      const primaryCalendar = calendars.find((c: any) => c.type === 'primary' && c.role === 'owner');
+      if (primaryCalendar?.calendar_id) {
+        Logger.info(`找到主日历(owner): ${primaryCalendar.calendar_id}`);
+        return primaryCalendar.calendar_id;
+      }
+
+      // 其次查找 type 为 "primary" 的日历（不限 role）
+      const primaryAny = calendars.find((c: any) => c.type === 'primary');
+      if (primaryAny?.calendar_id) {
+        Logger.info(`找到主日历: ${primaryAny.calendar_id}, role=${primaryAny.role}`);
+        return primaryAny.calendar_id;
+      }
+
+      // 再次查找 role 为 "owner" 的任何日历
+      const ownedCalendar = calendars.find((c: any) => c.role === 'owner');
+      if (ownedCalendar?.calendar_id) {
+        Logger.info(`未找到主日历类型，使用拥有者日历: ${ownedCalendar.calendar_id}`);
+        return ownedCalendar.calendar_id;
+      }
+
+      // 最后使用第一个可写日历
+      const writableCalendar = calendars.find((c: any) => c.role === 'owner' || c.role === 'writer');
+      if (writableCalendar?.calendar_id) {
+        Logger.info(`使用可写日历: ${writableCalendar.calendar_id}`);
+        return writableCalendar.calendar_id;
+      }
+
+      // 兜底：使用第一个日历
+      const firstCalendar = calendars[0];
+      if (firstCalendar?.calendar_id) {
+        Logger.info(`未找到可写日历，使用第一个日历: ${firstCalendar.calendar_id}`);
+        return firstCalendar.calendar_id;
+      }
+
+      Logger.warn(`日历列表中未找到有效的日历ID`);
+      return null;
+    } catch (error) {
+      // 权限不足错误需要向上传播，不能默默吞掉
+      if (error instanceof ScopeInsufficientError) {
+        throw error;
+      }
+      Logger.error('获取主日历ID失败:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 获取日历列表
+   * @returns 日历列表
+   */
+  public async getCalendarList(): Promise<any> {
+    try {
+      const endpoint = '/calendar/v4/calendars';
+      const response = await this.get(endpoint);
+      return response;
+    } catch (error) {
+      this.handleApiError(error, '获取日历列表失败');
+    }
+  }
+
+  /**
+   * 创建日历事件
+   * @param calendarId 日历ID（可选，不传则使用主日历）
+   * @param summary 事件标题
+   * @param startTime 开始时间
+   * @param endTime 结束时间
+   * @param description 事件描述（可选）
+   * @param attendees 参与者（可选）
+   * @param reminders 提醒配置（可选）
+   * @param visibility 可见性（可选）
+   * @param freeBusyStatus 忙闲状态（可选）
+   * @param location 地点（可选）
+   * @param recurrence 重复规则（可选）
+   * @param color 颜色（可选）
+   * @returns 创建的事件信息
+   */
+  public async createCalendarEvent(
+    calendarId: string | undefined,
+    summary: string,
+    startTime: { timestamp?: string; date?: string; timezone?: string },
+    endTime: { timestamp?: string; date?: string; timezone?: string },
+    description?: string,
+    attendees?: Array<{
+      type?: string;
+      user_id?: string;
+      chat_id?: string;
+      room_id?: string;
+      third_party_email?: string;
+      is_optional?: boolean;
+    }>,
+    reminders?: Array<{ minutes: number }>,
+    visibility?: string,
+    freeBusyStatus?: string,
+    location?: { name?: string; address?: string; latitude?: number; longitude?: number },
+    recurrence?: string,
+    color?: number
+  ): Promise<any> {
+    try {
+      // 如果未提供 calendarId，获取主日历ID
+      let targetCalendarId = calendarId;
+      if (!targetCalendarId) {
+        targetCalendarId = await this.getPrimaryCalendarId() || undefined;
+        if (!targetCalendarId) {
+          throw new Error('未提供日历ID，且无法获取主日历ID。请指定 calendarId 参数。');
+        }
+        Logger.info(`未指定日历ID，使用主日历: ${targetCalendarId}`);
+      }
+
+      const endpoint = `/calendar/v4/calendars/${targetCalendarId}/events?user_id_type=open_id`;
+
+      const payload: any = {
+        summary,
+        start_time: startTime,
+        end_time: endTime,
+      };
+
+      if (description) {
+        payload.description = description;
+      }
+
+      if (visibility && visibility !== 'default') {
+        payload.visibility = visibility;
+      }
+
+      if (freeBusyStatus) {
+        payload.free_busy_status = freeBusyStatus;
+      }
+
+      if (location) {
+        payload.location = location;
+      }
+
+      if (recurrence) {
+        payload.recurrence = recurrence;
+      }
+
+      if (color !== undefined) {
+        payload.color = color;
+      }
+
+      if (reminders && reminders.length > 0) {
+        payload.reminders = reminders;
+      }
+
+      Logger.debug(`创建日历事件请求载荷: ${JSON.stringify(payload, null, 2)}`);
+      const response = await this.post(endpoint, payload);
+
+      // 如果有参与者，需要单独添加
+      if (attendees && attendees.length > 0 && response?.event?.event_id) {
+        try {
+          const eventId = response.event.event_id;
+          await this.addCalendarEventAttendees(targetCalendarId, eventId, attendees);
+          Logger.info(`日历事件参与者添加成功`);
+        } catch (attendeeError) {
+          Logger.warn('添加日历事件参与者失败（事件已创建）:', attendeeError);
+          response._attendee_warning = '事件已创建成功，但添加参与者失败，请手动添加。';
+        }
+      }
+
+      return response;
+    } catch (error) {
+      this.handleApiError(error, '创建日历事件失败');
+    }
+  }
+
+  /**
+   * 添加日历事件参与者
+   * @param calendarId 日历ID
+   * @param eventId 事件ID
+   * @param attendees 参与者列表
+   * @returns 添加结果
+   */
+  private async addCalendarEventAttendees(
+    calendarId: string,
+    eventId: string,
+    attendees: Array<{
+      type?: string;
+      user_id?: string;
+      chat_id?: string;
+      room_id?: string;
+      third_party_email?: string;
+      is_optional?: boolean;
+    }>
+  ): Promise<any> {
+    try {
+      const endpoint = `/calendar/v4/calendars/${calendarId}/events/${eventId}/attendees`;
+
+      const payload = {
+        attendees: attendees.map(a => ({
+          type: a.type || 'user',
+          user_id: a.user_id,
+          chat_id: a.chat_id,
+          room_id: a.room_id,
+          third_party_email: a.third_party_email,
+          is_optional: a.is_optional || false,
+        })),
+      };
+
+      const response = await this.post(endpoint, payload);
+      return response;
+    } catch (error) {
+      this.handleApiError(error, '添加日历事件参与者失败');
     }
   }
 
