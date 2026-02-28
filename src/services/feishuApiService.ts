@@ -180,6 +180,7 @@ export class FeishuApiService extends BaseApiService {
       "sheets:spreadsheet:readonly",
       "space:document:retrieve",
       "space:folder:create",
+      "task:task:write",
       "wiki:space:read",
       "wiki:space:retrieve",
       "wiki:wiki",
@@ -2104,6 +2105,123 @@ export class FeishuApiService extends BaseApiService {
       const syntaxTypeName = syntaxType === 1 ? 'PlantUML' : 'Mermaid';
       Logger.error(`创建 ${syntaxTypeName} 节点失败，画板ID: ${whiteboardId}`, error);
       this.handleApiError(error, `创建 ${syntaxTypeName} 节点失败`);
+    }
+  }
+
+  // ============ 飞书任务相关方法 ============
+
+  /**
+   * 获取当前用户的 open_id
+   * 通过飞书 authen API 获取当前认证用户信息
+   * @returns 当前用户的 open_id，获取失败返回 null
+   */
+  public async getCurrentUserOpenId(): Promise<string | null> {
+    try {
+      const endpoint = '/authen/v1/user_info';
+      const response = await this.get(endpoint);
+      const openId = response?.open_id || null;
+      Logger.debug(`获取当前用户 open_id: ${openId}`);
+      return openId;
+    } catch (error) {
+      Logger.warn('获取当前用户信息失败，无法自动分配任务给创建者:', error);
+      return null;
+    }
+  }
+
+  /**
+   * 创建飞书任务
+   * @param summary 任务标题
+   * @param description 任务描述（可选）
+   * @param due 截止时间（可选）
+   * @param start 开始时间（可选）
+   * @param members 任务成员（可选），不传则自动分配给创建者
+   * @param origin 任务来源（可选）
+   * @param extra 额外信息（可选）
+   * @param repeatRule 重复规则（可选）
+   * @param customComplete 自定义完成配置（可选）
+   * @param mode 任务模式（可选）
+   * @returns 创建的任务信息
+   */
+  public async createTask(
+    summary: string,
+    description?: string,
+    due?: { timestamp: string; is_all_day?: boolean },
+    start?: { timestamp: string; is_all_day?: boolean },
+    members?: Array<{ id: string; type?: string; role?: string }>,
+    origin?: { platform_i18n_name: string },
+    extra?: string,
+    repeatRule?: string,
+    customComplete?: any,
+    mode?: number
+  ): Promise<any> {
+    try {
+      const endpoint = '/task/v2/tasks';
+
+      const payload: any = {
+        summary,
+      };
+
+      if (description) {
+        payload.description = description;
+      }
+
+      if (due) {
+        payload.due = due;
+      }
+
+      if (start) {
+        payload.start = start;
+      }
+
+      if (members && members.length > 0) {
+        // 指定了成员，使用指定的成员
+        payload.members = members.map(m => ({
+          id: m.id,
+          type: m.type || 'user',
+          role: m.role || 'assignee',
+        }));
+      } else {
+        // 未指定成员，自动分配给创建者
+        const creatorOpenId = await this.getCurrentUserOpenId();
+        if (creatorOpenId) {
+          payload.members = [{
+            id: creatorOpenId,
+            type: 'user',
+            role: 'assignee',
+          }];
+          Logger.info(`未指定任务成员，自动分配给创建者: ${creatorOpenId}`);
+        } else {
+          Logger.warn('未指定任务成员，且无法获取创建者信息，任务将不分配成员');
+        }
+      }
+
+      if (origin) {
+        payload.origin = {
+          platform_i18n_name: origin.platform_i18n_name,
+        };
+      }
+
+      if (extra) {
+        payload.extra = extra;
+      }
+
+      if (repeatRule) {
+        payload.repeat_rule = repeatRule;
+      }
+
+      if (customComplete) {
+        payload.custom_complete = customComplete;
+      }
+
+      if (mode !== undefined) {
+        payload.mode = mode;
+      }
+
+      Logger.debug(`创建飞书任务请求载荷: ${JSON.stringify(payload, null, 2)}`);
+      const response = await this.post(endpoint, payload);
+      return response;
+    } catch (error) {
+      this.handleApiError(error, '创建飞书任务失败');
     }
   }
 

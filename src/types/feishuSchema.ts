@@ -397,3 +397,89 @@ export const WhiteboardFillArraySchema = z.array(WhiteboardContentSchema).descri
 
 // 文档标题参数定义
 export const DocumentTitleSchema = z.string().describe('Document title (required). This will be displayed in the Feishu document list and document header.');
+
+// ============ 飞书任务相关 Schema ============
+
+// 任务标题参数定义
+export const TaskSummarySchema = z.string().describe(
+  'Task summary/title (required). The main title of the task, displayed in the task list.'
+);
+
+// 任务描述参数定义
+export const TaskDescriptionSchema = z.string().optional().describe(
+  'Task description (optional). Detailed description of the task content.'
+);
+
+// 任务截止时间参数定义
+export const TaskDueSchema = z.object({
+  timestamp: z.string().describe('Due date timestamp in seconds (required). Unix timestamp string, e.g. "1675454764".'),
+  is_all_day: z.boolean().optional().default(false).describe('Whether it is an all-day event (optional). Default is false.'),
+}).optional().describe(
+  'Task due date (optional). Contains a timestamp and whether it is an all-day event.'
+);
+
+// 任务开始时间参数定义
+export const TaskStartSchema = z.object({
+  timestamp: z.string().describe('Start date timestamp in seconds (required). Unix timestamp string, e.g. "1675454764".'),
+  is_all_day: z.boolean().optional().default(false).describe('Whether it is an all-day event (optional). Default is false.'),
+}).optional().describe(
+  'Task start date (optional). Contains a timestamp and whether it is an all-day event.'
+);
+
+// 任务优先级参数定义（自定义模式）
+export const TaskOriginSchema = z.object({
+  platform_i18n_name: z.string().describe('Platform name in i18n JSON format (required). e.g. \'{"en_us":"MCP","zh_cn":"MCP"}\''),
+}).optional().describe(
+  'Task origin/source platform information (optional). Identifies where the task was created from.'
+);
+
+// 任务额外参数定义
+export const TaskExtraSchema = z.string().optional().describe(
+  'Extra information for the task (optional). Custom data as a string, max 65536 characters.'
+);
+
+// 任务模式参数定义
+export const TaskModeSchema = z.number().optional().default(2).describe(
+  'Task mode (optional). 1: requires user to manually complete the task. 2: task can be completed when all subtasks are done (default: 2).'
+);
+
+// 任务成员参数定义
+export const TaskMembersSchema = z.array(z.object({
+  id: z.string().describe('Member ID (required). The open_id, user_id or union_id of the user.'),
+  type: z.string().optional().default('user').describe('Member type (optional). Default is "user".'),
+  role: z.string().optional().default('assignee').describe('Member role (optional). "assignee" for task assignee (default), "follower" for task follower.'),
+})).optional().describe(
+  'Task members (optional). Array of members to assign to the task. Each member needs an ID and optional role (assignee/follower).'
+);
+
+// 任务重复规则参数定义
+export const TaskRepeatRuleSchema = z.string().optional().describe(
+  'Task repeat rule in RRULE format (optional). e.g. "FREQ=WEEKLY;INTERVAL=1;BYDAY=MO,TU,WE,TH,FR" for weekday repeat.'
+);
+
+// 任务自定义完成配置参数定义
+export const TaskCustomCompleteSchema = z.object({
+  pc: z.object({
+    href: z.string().optional().describe('PC completion URL (optional).'),
+    tip: z.object({
+      en_us: z.string().optional().describe('English tip text'),
+      zh_cn: z.string().optional().describe('Chinese tip text'),
+    }).optional().describe('Tooltip text (optional).'),
+  }).optional().describe('PC platform configuration (optional).'),
+  ios: z.object({
+    href: z.string().optional().describe('iOS completion URL (optional).'),
+    tip: z.object({
+      en_us: z.string().optional().describe('English tip text'),
+      zh_cn: z.string().optional().describe('Chinese tip text'),
+    }).optional().describe('Tooltip text (optional).'),
+  }).optional().describe('iOS platform configuration (optional).'),
+  android: z.object({
+    href: z.string().optional().describe('Android completion URL (optional).'),
+    tip: z.object({
+      en_us: z.string().optional().describe('English tip text'),
+      zh_cn: z.string().optional().describe('Chinese tip text'),
+    }).optional().describe('Tooltip text (optional).'),
+  }).optional().describe('Android platform configuration (optional).'),
+}).optional().describe(
+  'Custom complete configuration (optional). Controls how the task is completed on different platforms.'
+);
