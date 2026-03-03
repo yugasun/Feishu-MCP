@@ -271,6 +271,36 @@ export const MediaExtraSchema = z.string().optional().describe(
   'These parameters are passed directly to the Feishu API and can modify how the media is returned.'
 );
 
+// 消息ID参数定义
+export const MessageIdSchema = z.string().describe(
+  'Message ID (required). The unique identifier for a Feishu IM message. ' +
+  'Format is typically like "om_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx".'
+);
+
+// 文件Key参数定义 - 用于消息资源下载
+export const FileKeySchema = z.string().describe(
+  'File key (required). The unique key for a file or image resource attached to a Feishu message. ' +
+  'Obtained from the message body content, e.g. "file_v3_00ve_xxxxxxxx" or image_key format.'
+);
+
+// 消息资源类型参数定义
+export const MessageResourceTypeSchema = z.enum(['image', 'file']).optional().default('file').describe(
+  'Resource type (optional). "image" for image messages, "file" for file messages. Default is "file".'
+);
+
+// 消息资源文件名参数定义
+export const MessageFileNameSchema = z.string().optional().describe(
+  'File name (optional). The original file name including extension, e.g. "2.28.zip" or "photo.jpg". ' +
+  'Obtained from the message body content (file_name field). If not provided, the file_key will be used as the file name.'
+);
+
+// 文件保存路径参数定义
+export const SavePathSchema = z.string().optional().describe(
+  'Directory path to save the downloaded file (optional). ' +
+  'If not provided, defaults to the system temporary directory (/tmp or equivalent). ' +
+  'Example: "/app/downloads" or "/tmp/feishu".'
+);
+
 // 文件夹Token参数定义（必传）
 export const FolderTokenSchema = z.string().describe(
   'Folder token (required). The unique identifier for a folder in Feishu. ' +

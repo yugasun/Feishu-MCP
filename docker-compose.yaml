@@ -16,3 +16,11 @@ services:
       - ./logs:/app/logs
       - ./cache:/app/cache
     restart: unless-stopped
+    networks:
+      - feishu-net
+
+networks:
+  feishu-net:
+    driver: bridge
+    # driver_opts:
+    #   com.docker.network.driver.mtu: "1450"

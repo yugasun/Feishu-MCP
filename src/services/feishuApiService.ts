@@ -2457,6 +2457,60 @@ export class FeishuApiService extends BaseApiService {
   }
 
   /**
+   * 获取飞书消息内容
+   * @param messageId 消息ID
+   * @returns 消息内容（包含 items 数组）
+   */
+  public async getMessageContent(messageId: string): Promise<any> {
+    try {
+      if (!messageId) {
+        throw new Error('消息ID不能为空');
+      }
+
+      const endpoint = `/im/v1/messages/${messageId}`;
+      Logger.info(`开始获取消息内容，消息ID: ${messageId}`);
+
+      const response = await this.get(endpoint);
+      Logger.info(`消息内容获取成功，消息ID: ${messageId}`);
+      return response;
+    } catch (error) {
+      this.handleApiError(error, '获取消息内容失败');
+    }
+  }
+
+  /**
+   * 获取飞书消息中的资源文件（图片或文件）
+   * @param messageId 消息ID
+   * @param fileKey 文件Key（从消息体中提取）
+   * @param type 资源类型：'image' 或 'file'，默认为 'file'
+   * @returns 资源文件的二进制数据
+   */
+  public async getMessageResource(messageId: string, fileKey: string, type: string = 'file'): Promise<Buffer> {
+    try {
+      if (!messageId) {
+        throw new Error('消息ID不能为空');
+      }
+      if (!fileKey) {
+        throw new Error('文件Key不能为空');
+      }
+
+      const endpoint = `/im/v1/messages/${messageId}/resources/${fileKey}`;
+      const params = { type };
+
+      Logger.info(`开始获取消息资源，消息ID: ${messageId}，文件Key: ${fileKey}，类型: ${type}`);
+
+      const response = await this.request<ArrayBuffer>(endpoint, 'GET', params, true, {}, 'arraybuffer');
+      const fileBuffer = Buffer.from(response);
+
+      Logger.info(`消息资源获取成功，大小: ${fileBuffer.length} 字节`);
+      return fileBuffer;
+    } catch (error) {
+      this.handleApiError(error, '获取消息资源失败');
+      return Buffer.from([]); // 永远不会执行到这里
+    }
+  }
+
+  /**
    * 从路径或URL获取图片的Base64编码
    * @param imagePathOrUrl 图片路径或URL
    * @returns 图片的Base64编码和文件名
